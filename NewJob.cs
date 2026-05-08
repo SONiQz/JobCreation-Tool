@@ -2,6 +2,7 @@
 
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
@@ -13,6 +14,8 @@ namespace RLJobCreation_Framework
         public NewJob()
         {
             InitializeComponent();
+            this.JobNo.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.JobNo_KeyPress);
+            this.JobNo.TextChanged += new System.EventHandler(this.JobNo_TextChanged);
         }
 
         private void NewJob_Load(object sender, EventArgs e)
@@ -35,9 +38,22 @@ namespace RLJobCreation_Framework
 
         private void JobNo_KeyPress(object sender, KeyPressEventArgs e)
         {
+
             if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
             {
                 e.Handled = true;
+            }
+        }
+
+        private void JobNo_TextChanged(object sender, EventArgs e)
+        {
+            TextBox tb = sender as TextBox;
+
+            if (tb.Text.Any(c => !char.IsDigit(c)))
+            {
+                MessageBox.Show("Input Job Numbers Only");
+                tb.Text = new string(tb.Text.Where(char.IsDigit).ToArray());
+                tb.SelectionStart = tb.Text.Length;
             }
         }
 
@@ -74,7 +90,7 @@ namespace RLJobCreation_Framework
             // 
             this.JobNo.Location = new System.Drawing.Point(111, 75);
             this.JobNo.Name = "JobNo";
-            this.JobNo.Size = new System.Drawing.Size(121, 22);
+            this.JobNo.Size = new System.Drawing.Size(121, 29);
             this.JobNo.TabIndex = 0;
             // 
             // contextMenuStrip1
@@ -87,7 +103,7 @@ namespace RLJobCreation_Framework
             // 
             this.JobTitle.Location = new System.Drawing.Point(111, 116);
             this.JobTitle.Name = "JobTitle";
-            this.JobTitle.Size = new System.Drawing.Size(235, 22);
+            this.JobTitle.Size = new System.Drawing.Size(235, 29);
             this.JobTitle.TabIndex = 2;
             // 
             // JobLocationCombo
@@ -102,7 +118,7 @@ namespace RLJobCreation_Framework
             "Newport"});
             this.JobLocationCombo.Location = new System.Drawing.Point(111, 32);
             this.JobLocationCombo.Name = "JobLocationCombo";
-            this.JobLocationCombo.Size = new System.Drawing.Size(121, 24);
+            this.JobLocationCombo.Size = new System.Drawing.Size(121, 32);
             this.JobLocationCombo.TabIndex = 3;
             // 
             // AboutButton
@@ -140,7 +156,7 @@ namespace RLJobCreation_Framework
             this.LocationLabel.AutoSize = true;
             this.LocationLabel.Location = new System.Drawing.Point(18, 35);
             this.LocationLabel.Name = "LocationLabel";
-            this.LocationLabel.Size = new System.Drawing.Size(87, 16);
+            this.LocationLabel.Size = new System.Drawing.Size(130, 25);
             this.LocationLabel.TabIndex = 7;
             this.LocationLabel.Text = "Job Location:";
             // 
@@ -149,7 +165,7 @@ namespace RLJobCreation_Framework
             this.JobNoLabel.AutoSize = true;
             this.JobNoLabel.Location = new System.Drawing.Point(18, 78);
             this.JobNoLabel.Name = "JobNoLabel";
-            this.JobNoLabel.Size = new System.Drawing.Size(84, 16);
+            this.JobNoLabel.Size = new System.Drawing.Size(125, 25);
             this.JobNoLabel.TabIndex = 8;
             this.JobNoLabel.Text = "Job Number:";
             // 
@@ -158,7 +174,7 @@ namespace RLJobCreation_Framework
             this.JobTitleLabel.AutoSize = true;
             this.JobTitleLabel.Location = new System.Drawing.Point(18, 119);
             this.JobTitleLabel.Name = "JobTitleLabel";
-            this.JobTitleLabel.Size = new System.Drawing.Size(62, 16);
+            this.JobTitleLabel.Size = new System.Drawing.Size(93, 25);
             this.JobTitleLabel.TabIndex = 9;
             this.JobTitleLabel.Text = "Job Title:";
             // 
@@ -250,7 +266,7 @@ namespace RLJobCreation_Framework
                 MessageBox.Show("No Job Location Set");
                 return;
             }
-
+            CurrJobNo = CurrJobNo.Trim();
             int JobNoLen = CurrJobNo.Length;
             if (JobNoLen > 0 && JobNoLen <= 4)
             {
@@ -262,6 +278,7 @@ namespace RLJobCreation_Framework
                 RootPath = CurrJobNo.Substring(0, 3);
                 RootPath = RootPath + "00";
             }
+
             else
             {
                 MessageBox.Show("Job Number Empty");
@@ -270,7 +287,8 @@ namespace RLJobCreation_Framework
 
             if (JobTitle.Text.Length > 0)
             {
-                string CleanJobName = Regex.Replace(JobTitle.Text, $"[{Regex.Escape(new string(Path.GetInvalidFileNameChars()))}]", "_");
+                string TrimJobName = Regex.Replace(JobTitle.Text.Trim(), @"\s{2,}", " ");
+                string CleanJobName = Regex.Replace(TrimJobName, $"[{Regex.Escape(new string(Path.GetInvalidFileNameChars()))}]", "_");
                 JobName = JobNo.Text + " - " + CleanJobName;
             }
             else
@@ -286,14 +304,16 @@ namespace RLJobCreation_Framework
             );
 
             if (result == DialogResult.OK)
-            {
+            {   
                 string ProjectPath = DriveId + ":\\" + RootPath + "\\";
                 string WildJobNo = CurrJobNo + "*";
                 if (Directory.Exists(ProjectPath))
                 {
-                    bool DirectoryExists = Directory.GetDirectories(ProjectPath, WildJobNo).Length > 0;
-                    if (DirectoryExists)
-                    {
+                    bool directoryExists = Directory.EnumerateDirectories(ProjectPath)
+                        .Any(d =>Path.GetFileName(d)
+                        .StartsWith(CurrJobNo, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (directoryExists) {
                         MessageBox.Show("Job Number Already Exists on System - Please Check Inputs");
                         return;
                     }
@@ -301,7 +321,6 @@ namespace RLJobCreation_Framework
 
                 CreatingForm creatingForm = new CreatingForm(CompletePath, JobNo.Text, DriveId, RootPath);
                 creatingForm.Show();
-
             }
 
             if (result == DialogResult.Cancel)
